@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Suas fotos do treino</title>
+<style>
+  :root { --destaque: #f5c542; --fundo: #111; --texto: #f2f2f2; --cinza: #8a8a8a; --verde: #2fb36b; --vermelho: #e04848; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--fundo); color: var(--texto); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; min-height: 100vh; }
+  main { max-width: 520px; margin: 0 auto; padding: 16px 16px 32px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  h1 { font-size: 18px; font-weight: 700; }
+  #progresso { color: var(--cinza); font-size: 14px; }
+  .barra { height: 4px; background: #2a2a2a; border-radius: 2px; margin-bottom: 14px; overflow: hidden; }
+  .barra i { display: block; height: 100%; background: var(--destaque); width: 0; transition: width .2s; }
+  .card img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; display: block; border-radius: 8px; border: 1px solid #2a2a2a; background: #000; }
+  .codigo { color: var(--cinza); font-size: 13px; margin: 8px 0 12px; }
+  .codigo b { color: var(--destaque); }
+  .botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  button { font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 16px; cursor: pointer; color: #fff; }
+  .sim { background: var(--verde); }
+  .nao { background: var(--vermelho); }
+  .escolhido { outline: 3px solid #fff; outline-offset: 2px; }
+  .nav { display: flex; justify-content: space-between; margin-top: 14px; }
+  .nav button { background: transparent; color: var(--cinza); padding: 8px 0; font-weight: 500; }
+  .nav button:disabled { opacity: .3; }
+  textarea { width: 100%; margin-top: 12px; background: #1c1c1c; color: var(--texto); border: 1px solid #2f2f2f; border-radius: 8px; padding: 10px; font: inherit; font-size: 15px; resize: vertical; min-height: 44px; }
+  #fim { display: none; }
+  #fim h2 { font-size: 22px; margin-bottom: 8px; }
+  #fim p { color: var(--cinza); margin-bottom: 16px; }
+  #resumo { white-space: pre-wrap; background: #1c1c1c; border: 1px solid #2f2f2f; border-radius: 8px; padding: 12px; font-size: 14px; margin-bottom: 16px; }
+  .whats { background: #25d366; width: 100%; margin-bottom: 10px; }
+  .copiar { background: #333; width: 100%; margin-bottom: 10px; }
+  .voltar { background: transparent; color: var(--cinza); width: 100%; font-weight: 500; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Suas fotos do treino</h1>
+    <span id="progresso"></span>
+  </header>
+  <div class="barra"><i id="barra"></i></div>
+
+  <section id="votacao">
+    <div class="card"><img id="img" alt=""></div>
+    <div class="codigo">Foto <b id="codigo"></b></div>
+    <div class="botoes">
+      <button class="sim" id="bSim">✓ OK</button>
+      <button class="nao" id="bNao">✕ Tirar</button>
+    </div>
+    <textarea id="obs" rows="1" placeholder="Quer algum ajuste nesta foto? Escreva aqui (opcional)"></textarea>
+    <div class="nav">
+      <button id="ant">← Anterior</button>
+      <button id="prox">Próxima →</button>
+    </div>
+  </section>
+
+  <section id="fim">
+    <h2>Pronto!</h2>
+    <p>Toque no botão verde para mandar suas respostas pelo WhatsApp.</p>
+    <div id="resumo"></div>
+    <button class="whats" id="bWhats">Enviar pelo WhatsApp</button>
+    <button class="copiar" id="bCopiar">Copiar respostas</button>
+    <button class="voltar" id="bRever">Rever as fotos</button>
+  </section>
+</main>
+
+<script src="fotos.js?v=1"></script>
+<script>
+  const CHAVE = "fotos-treino-2026-11-13";
+  let votos = {}, obs = {}, i = 0;
+  try { ({ votos = {}, obs = {}, i = 0 } = JSON.parse(localStorage.getItem(CHAVE)) || {}); } catch (e) {}
+  const $ = id => document.getElementById(id);
+  const salvar = () => { try { localStorage.setItem(CHAVE, JSON.stringify({ votos, obs, i })); } catch (e) {} };
+
+  // pré-carrega a próxima foto
+  const precarrega = n => { if (FOTOS[n]) new Image().src = FOTOS[n].img; };
+
+  function mostrar() {
+    const c = FOTOS[i];
+    $("img").src = c.img;
+    $("img").alt = "Foto " + c.id;
+    $("codigo").textContent = c.id + " de " + FOTOS.length;
+    $("obs").value = obs[c.id] || "";
+    $("bSim").classList.toggle("escolhido", votos[c.id] === "sim");
+    $("bNao").classList.toggle("escolhido", votos[c.id] === "nao");
+    $("ant").disabled = i === 0;
+    const feitos = Object.keys(votos).length;
+    $("progresso").textContent = feitos + " de " + FOTOS.length + " respondidas";
+    $("barra").style.width = (feitos / FOTOS.length * 100) + "%";
+    precarrega(i + 1);
+    window.scrollTo(0, 0);
+  }
+
+  function irPara(n) {
+    if (n >= FOTOS.length) return fim();
+    i = Math.max(0, n); salvar(); mostrar();
+  }
+
+  function votar(v) {
+    votos[FOTOS[i].id] = v; salvar();
+    setTimeout(() => irPara(i + 1), 150);
+  }
+
+  function texto() {
+    const rot = c => c.id + " (" + c.arquivo + ")";
+    const sim = FOTOS.filter(c => votos[c.id] === "sim").map(rot);
+    const nao = FOTOS.filter(c => votos[c.id] === "nao").map(rot);
+    const falta = FOTOS.filter(c => !votos[c.id]).map(c => c.id);
+    let t = "Fotos do treino: minhas respostas\n\n";
+    t += "✓ OK (" + sim.length + "): " + (sim.join(", ") || "nenhuma") + "\n";
+    t += "✕ Tirar (" + nao.length + "): " + (nao.join(", ") || "nenhuma") + "\n";
+    if (falta.length) t += "Sem resposta: " + falta.join(", ") + "\n";
+    const notas = FOTOS.filter(c => obs[c.id]).map(c => c.id + ": " + obs[c.id]);
+    if (notas.length) t += "\nAjustes pedidos:\n" + notas.join("\n") + "\n";
+    return t;
+  }
+
+  function fim() {
+    $("votacao").style.display = "none";
+    $("fim").style.display = "block";
+    $("resumo").textContent = texto();
+    const feitos = Object.keys(votos).length;
+    $("progresso").textContent = feitos + " de " + FOTOS.length + " respondidas";
+    $("barra").style.width = (feitos / FOTOS.length * 100) + "%";
+    window.scrollTo(0, 0);
+  }
+
+  $("bSim").onclick = () => votar("sim");
+  $("bNao").onclick = () => votar("nao");
+  $("ant").onclick = () => irPara(i - 1);
+  $("prox").onclick = () => irPara(i + 1);
+  $("obs").oninput = e => { obs[FOTOS[i].id] = e.target.value.trim(); salvar(); };
+  $("bWhats").onclick = () => { location.href = "https://wa.me/?text=" + encodeURIComponent(texto()); };
+  $("bCopiar").onclick = async () => {
+    try { await navigator.clipboard.writeText(texto()); $("bCopiar").textContent = "Copiado!"; }
+    catch (e) { $("bCopiar").textContent = "Não deu para copiar, tire um print"; }
+  };
+  $("bRever").onclick = () => { $("fim").style.display = "none"; $("votacao").style.display = "block"; irPara(0); };
+
+  mostrar();
+</script>
+</body>
+</html>
